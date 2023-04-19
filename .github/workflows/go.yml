@@ -1,61 +1,48 @@
-name: Go
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
+
+name: Node.js CI
 
 on:
-  push:
-    branches: [ "*" ]
+
   pull_request:
-    branches: [ "*" ]
+    branches: [ develop ]
 
 jobs:
-
   test:
-    runs-on: ${{ matrix.os }}
+  
+    runs-on: ubuntu-latest
+
     env:
-      PORT: 5432
-      HOST: localhost
-      USER: root
-      PASSWORD: root 
-      DBNAME: root
-      
+      POSTGRES_USERNAME: ${{ secrets.POSTGRES_USERNAME }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DBNAME: ${{ secrets.POSTGRES_DBNAME }}
+      POSTGRES_SCHEMA: ${{ secrets.POSTGRES_SCHEMA }}
+      POSTGRES_PORT:  ${{ secrets.POSTGRES_PORT }}
+      POSTGRES_HOST:  ${{ secrets.POSTGRES_HOST }}
+      PGADMIN_EMAIL: ${{ secrets.PGADMIN_EMAIL }}
+      PGADMIN_PASSWORD: ${{ secrets.PGADMIN_PASSWORD }}
+      PORT: ${{ secrets.PORT }}
+      NODE_ENV: ${{ secrets.NODE_ENV }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+    
     strategy:
       matrix:
-        go_version: ['1.18', '1.17', '>=1.18']
-        os: ['ubuntu-latest']
+        node-version: [16.x, 18.x]
+
     steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ matrix.go_version }}
-      
-    - name: Build-DB
-      run: docker-compose build
-      
-    - name: Create-DB
-      run: docker-compose up -d
-
-    - name: Test
-      run: go test -v main_test.go 
-      
-  
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: go build -v main.go
-      
-    - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v3.1.2
-      with:
-        # Artifact name
-        name: api_em_go
-        # A file, directory or wildcard pattern that describes what to upload
-        path: main
-
-  docker:
-    needs: build
-    uses: ./.github/workflows/docker.yml
-    secrets: inherit
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Run docker-compose
+        run: docker-compose up -d regula_sun_bd
+      - name: Install dependencies
+        run: npm install
+      - name: populate database
+        run: npm run migrate
+      - name: Run tests
+        run: npm run test
